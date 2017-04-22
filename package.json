@@ -14,6 +14,7 @@
     "body-parser": "*"
   },
   "devDependencies": {
-    "webpack": "*"
+    "webpack": "*",
+    "webpack-build": "^1.0.1"
   }
 }

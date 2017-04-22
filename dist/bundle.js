@@ -67,7 +67,66 @@
 /******/ })
 /************************************************************************/
 /******/ ([
-/* 0 */
+/* 0 */,
+/* 1 */
+/***/ (function(module, __webpack_exports__, __webpack_require__) {
+
+"use strict";
+Object.defineProperty(__webpack_exports__, "__esModule", { value: true });
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_0__counter_state__ = __webpack_require__(4);
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_1__component__ = __webpack_require__(3);
+
+
+
+__webpack_require__.i(__WEBPACK_IMPORTED_MODULE_1__component__["a" /* component */])({
+    selector: 'counter',
+    template: `
+        <div>
+            <b>
+                <label>Name:</label> 
+                <span subscribe="textContent=name.name; style=readName"></span>
+                <input subscribe="value=name.name; style=editName">
+            </b>
+            <button subscribe="style=readName" dispatch="EDITNAME">Edit</button>
+            <button subscribe="style=editName" dispatch="CONFIRMNAME">Confirm</button>
+            <button subscribe="style=editName" dispatch="CANCELNAME">Cancel</button>
+        </div>
+        <div>
+            <label>Count: </label>
+            <span subscribe="textContent=counter"></span>
+        </div>
+        <div>
+            <label>Toggle state: </label>
+            <span subscribe="textContent=stateToggle"></span>
+        </div>
+        <p/>
+        <div>
+            <button dispatch="ADD">+</button>
+            <button dispatch="SUBSTRACT">-</button>
+            <button dispatch="TOGGLE">~</button>
+        </div>
+    `,
+    store: __WEBPACK_IMPORTED_MODULE_0__counter_state__["a" /* store */],
+    controller: {
+        
+        stateToggle: (state) => {
+            return state.toggle ? 'ON' : 'OFF';
+        },
+
+        editName: (state) => {
+            return state.name.isEditMode ? 'display: inline' : 'display: none';
+        },
+
+        readName: (state) => {
+            return !state.name.isEditMode ? 'display: inline' : 'display: none';
+        }
+    }
+})
+
+__WEBPACK_IMPORTED_MODULE_0__counter_state__["a" /* store */].dispatch();
+
+/***/ }),
+/* 2 */
 /***/ (function(module, __webpack_exports__, __webpack_require__) {
 
 "use strict";
@@ -89,29 +148,114 @@ const createStore = (reducer) => {
         }
     }
 
-    dispatch({});
-
     return { getState, dispatch, subscribe };
 }
 /* harmony export (immutable) */ __webpack_exports__["a"] = createStore;
 
 
 /***/ }),
-/* 1 */
+/* 3 */
 /***/ (function(module, __webpack_exports__, __webpack_require__) {
 
 "use strict";
-Object.defineProperty(__webpack_exports__, "__esModule", { value: true });
-/* harmony import */ var __WEBPACK_IMPORTED_MODULE_0__redux__ = __webpack_require__(0);
+
+Element.prototype.listAttributed = function (attributeName, handler) {
+    const elements = this.querySelectorAll(`[${attributeName}]`);
+    Array.prototype.forEach.call(elements, (element) => {
+        
+        const attributeValue = element.getAttribute(attributeName);
+        handler(element, attributeValue);
+    });
+};
+
+Object.prototype.val = function(key){
+
+    if(key.includes('.')){
+        return key.split('.').reduce((prev, curr) => {
+            return prev ? prev[curr] : undefined;
+        }, this);
+    } else{
+        return this[key];
+    }
+};
+
+const subscribe = (subscriber, expression) => {
+
+    const subscribeExpressions = expression
+        .split(';')
+        .map(s => s.trim())
+        .map(s => {
+            const pair = s.split('=').map( ss => ss.trim());
+            return { property: pair[0], expression: pair[1] };
+        });        
+
+    return (store, controller) => {
+        store.subscribe(() => {
+            const state = store.getState();
+
+            subscribeExpressions.forEach(se => {
+                const getter = controller[se.expression];
+
+                subscriber[se.property] = getter && typeof getter == 'function'
+                    ? getter(state) + ''
+                    : state.val(se.expression) + '' 
+            });
+        });
+    };
+};
+
+const component = (config) => {
+
+    const rootDOM = document.getElementsByTagName(config.selector).item(0);
+    if(rootDOM){
+        rootDOM.innerHTML = config.template;
+
+        rootDOM.listAttributed('subscribe', (subscriber, expression) => {
+
+            subscribe(subscriber, expression)(config.store, config.controller);
+        });
+
+        rootDOM.listAttributed('dispatch', (dispatcher, action) => {
+
+            dispatcher.addEventListener('click', () => {
+
+                const controller = config.controller[action];
+                if(controller && typeof(controller) == 'function'){
+                    controller();    
+                } else{
+                    config.store.dispatch({type: action});
+                }
+            });
+        });
+    }
+};
+/* harmony export (immutable) */ __webpack_exports__["a"] = component;
 
 
-const counter = (state = {}, action) => {
+/***/ }),
+/* 4 */
+/***/ (function(module, __webpack_exports__, __webpack_require__) {
+
+"use strict";
+/* harmony import */ var __WEBPACK_IMPORTED_MODULE_0__redux__ = __webpack_require__(2);
+
+
+const defaultState = {
+    counter: 0, 
+    toggle: false, 
+    name: {
+        name: '',
+        isEditMode: false
+    }
+};
+
+const counter = (state = defaultState, action = {type: 'NOACTION'}) => {
     switch (action.type) {
-        case 'INCREMENT':
+        case 'ADD':
             return Object.assign({}, state, {
                 counter: state.counter + 1
             });
-        case 'DECREMENT':
+        case 'SUBSTRACT':
             return Object.assign({}, state, {
                 counter: state.counter - 1
             });;
@@ -119,39 +263,39 @@ const counter = (state = {}, action) => {
             return Object.assign({}, state, {
                 toggle: !state.toggle
             });
+        
+        case 'EDITNAME':
+            return Object.assign({}, state, {
+                name: Object.assign({}, state.name, {
+                    isEditMode: true
+                })
+            });
+        case 'CONFIRMNAME':
+            return Object.assign({}, state, {
+                name: {
+                    name: action.name,
+                    isEditMode: false
+                }
+            });
+        case 'CANCELNAME':
+            return Object.assign({}, state, {
+                name: Object.assign({}, state.name, {
+                    isEditMode: false
+                })
+            });
+
         default:
+            if(action.type != 'NOACTION'){
+                console.warn('Action "' + action.type + '" not found');
+            }
+
             return state;
     }
 }
 
 const store = __webpack_require__.i(__WEBPACK_IMPORTED_MODULE_0__redux__["a" /* createStore */])(counter);
+/* harmony export (immutable) */ __webpack_exports__["a"] = store;
 
-document.body.innerHTML = `
-    <h3>State:</h3>
-    <div></div>
-    <button onclick="store.dispatch('INCREMENT')">+</button>
-    <button onclick="store.dispatch('DECREMENT')">-</button>
-    <button onclick="store.dispatch('TOGGLE')">~</button>
-`;
-
-const stateDOM = document.getElementsByTagName('div');
-const counterDOM = document.createElement('span');
-const toggleDOM = document.createElement('span');
-stateDOM.appendChild(counterDOM);
-stateDOM.appendChild(toggleDOM);
-
-document.body.insertBefore(stateDOM, document.getElementsByTagName('button'));
-
-const render = () => {
-    let currentState = store.getState();
-
-    counterDOM.innerText = `Count: ${ currentState.counter }`;
-    toggleDOM.innerText = `Toggle: ${ currentState.toggle ? 'on' : 'off' }`;
-};
-
-store.subscribe(render);
-
-render();
 
 /***/ })
 /******/ ]);
