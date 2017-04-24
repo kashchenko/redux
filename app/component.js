@@ -1,48 +1,39 @@
 
-Element.prototype.listAttributed = function (attributeName, handler) {
-    const elements = this.querySelectorAll(`[${attributeName}]`);
-    Array.prototype.forEach.call(elements, (element) => {
-        
-        const attributeValue = element.getAttribute(attributeName);
-        handler(element, attributeValue);
+const scanExpressionContents = () => {
+    const content = this.innerHTML;
+    let expressions = [];
+
+    if(content.startsWith('{') && content.endsWith('}')){
+        expressions.push({
+            element: this,
+            expression: content.slice(1, -1)
+        });
+    }
+
+    [].forEach.call(this.children, (c) => {
+        expressions = [...c.scanExpressions(), ...expressions];
     });
 };
 
-Object.prototype.val = function(key){
+const scanExpressionAttributes = () => {
 
-    if(key.includes('.')){
-        return key.split('.').reduce((prev, curr) => {
-            return prev ? prev[curr] : undefined;
-        }, this);
-    } else{
-        return this[key];
-    }
-};
+}
 
-const subscribe = (subscriber, expression) => {
+Element.prototype.scanExpressions = function(){
 
-    const subscribeExpressions = expression
-        .split(';')
-        .map(s => s.trim())
-        .map(s => {
-            const pair = s.split('=').map( ss => ss.trim());
-            return { property: pair[0], expression: pair[1] };
-        });        
+    const content = this.innerHTML;
 
-    return (store, controller) => {
-        store.subscribe(() => {
-            const state = store.getState();
-
-            subscribeExpressions.forEach(se => {
-                const getter = controller[se.expression];
-
-                subscriber[se.property] = getter && typeof getter == 'function'
-                    ? getter(state) + ''
-                    : state.val(se.expression) + '' 
-            });
+    if(content.startsWith('{') && content.endsWith('}')){
+        expressions.push({
+            element: this,
+            expression: content.slice(1, -1)
         });
-    };
-};
+    }
+
+    [].forEach.call(this.children, (c) => {
+        c.scanExpressions();
+    });
+}
 
 export const component = (config) => {
 
@@ -50,22 +41,6 @@ export const component = (config) => {
     if(rootDOM){
         rootDOM.innerHTML = config.template;
 
-        rootDOM.listAttributed('subscribe', (subscriber, expression) => {
 
-            subscribe(subscriber, expression)(config.store, config.controller);
-        });
-
-        rootDOM.listAttributed('dispatch', (dispatcher, action) => {
-
-            dispatcher.addEventListener('click', () => {
-
-                const controller = config.controller[action];
-                if(controller && typeof(controller) == 'function'){
-                    controller();    
-                } else{
-                    config.store.dispatch({type: action});
-                }
-            });
-        });
     }
 };
